@@ -25,7 +25,6 @@ class Outcome(object):
     def __str__(self):
         return "%s (%d:1)" % ( self.name, self.odds )
 
-
 class Bin(object):
     """
     Bin contains a collection of OUTCOMEs which reflect the winning bets that are paid for a particular bin on a
@@ -54,7 +53,6 @@ class Wheel(object):
         self.bins = tuple( Bin() for i in range(38) )
         self.all_outcomes = frozenset()
 
-
     def addOutcome(self, number, outcome):
         """
         adds the given OUTCOME to the BIN with the given number.
@@ -62,8 +60,6 @@ class Wheel(object):
 
         self.bins[number].add(outcome)
         self.all_outcomes = self.all_outcomes | frozenset([outcome])
-
-
 
     def next(self):
         """
@@ -81,8 +77,6 @@ class Wheel(object):
         OC = set([  oc for oc in self.all_outcomes if oc.name.lower() == name.lower()  ])
         assert len(OC) == 1
         return OC
-
-
 
 class NonRandom(random.Random):
     """
@@ -205,7 +199,6 @@ class BinBuilder(object):
             outcome_list.append((i, Outcome("Five Bet", 6)))
         return outcome_list
 
-
     def line_bet(self):
         """
          There are 11 such combinations
@@ -254,7 +247,6 @@ class BinBuilder(object):
                 outcome_list.append((i, Outcome(k, 1)))
         return outcome_list
 
-
 class Bet(object):
     """
     Bet associates an amount and an Outcome. We can also associate a Bet with a Player.
@@ -274,13 +266,9 @@ class Bet(object):
     def __str__(self):
         return "amount on " + str(self.outcome)
 
-
 class Table(object):
     """
-    todo:
-        Table Minimum
-        exception for illegal bet
-        bet deletion
+
 
     """
     def __init__(self, limit):
@@ -311,8 +299,6 @@ class Table(object):
     def __str__(self):
         return str(list( str(b) for b in self.bets ) )
 
-
-
 class InvalidBet(Exception):
     """
     Error raised when the bet limit is exceeded. This shouldn't normally happen.
@@ -320,11 +306,9 @@ class InvalidBet(Exception):
     def __init__(self, bets):
         self.bets = bets
 
-
     def __str__(self):
         return  "The total of all bets has exceeded the bet limit. This shouldn't normally happen. Bets = %s Sum = %i" %\
               (str(list(b.amount for b in self.bets)), sum(list(b.amount for b in self.bets)) )
-
 
 class Player(object):
     """
@@ -347,18 +331,20 @@ class Player(object):
         """
         raise NotImplementedError
 
-
     def isValid(self, bet):
         """
         checks with TABLE to see if the BET is valid
         """
         return self.table.isValid(bet)
 
+    def reset_class_defaults(self):
+        pass
+
     def win(self, bet):
         self.stake += bet.winAmount()
 
     def lose(self, bet):
-        self.stake -= bet.loseAmount()
+        pass
 
     def setStake(self, stake):
         self.stake = stake
@@ -370,6 +356,8 @@ class Martingale(Player):
     """
 
     """
+    _baseWager = 1
+    _lossCount = 0
     def __init__(self, table, stake, roundsToGo):
         Player.__init__(self, table, stake, roundsToGo)
         self.baseWager = 1
@@ -377,51 +365,51 @@ class Martingale(Player):
         self.betMultiple = 2**self.lossCount # this should always equal 2**lossCount
         self.black = Outcome("Black", 1)
 
-
-
     def placeBets(self):
         """
         makes a BET based on the martingale strategy and the LOSSCOUNT
         """
+        self.betMultiple = 2**self.lossCount
 
         _bet =  Bet(self.baseWager*self.betMultiple, self.black)
-        if _bet.amount > self.stake:
+        # print "__1__",self.stake, _bet.amount
+
+        if (self.stake - _bet.amount) < 0:
             _bet =  Bet(self.stake, self.black)
+            # print "__2__",_bet.amount
+            # print self.stake, _bet.amount
 
         if self.isValid(_bet):
             self.stake -= _bet.amount
             self.table.placeBet(_bet)
+            self.roundsToGo -=1
 
     def win(self, bet):
         self.lossCount = 0
-        self.betMultiple = 2**self.lossCount
         self.stake += bet.winAmount()
 
     def lose(self, bet):
         self.lossCount += 1
-        self.betMultiple = 2**self.lossCount
-        self.stake -= bet.loseAmount()
+
+
+    def reset_class_defaults(self):
+        self.baseWager = Martingale._baseWager
+        self.lossCount = Martingale._lossCount
 
 class Passenger57(Player):
     """
-    This is a stub of the player class which is needed to test GAME
-    This will eventually be a subclass of PLAYER
-    Responsible for:
-        placing bets when notified to do so by GAME
-
+    Passenger57 always bets black
     """
     def __init__(self, table, stake, roundsToGo):
         Player.__init__(self, table, stake, roundsToGo)
         self.black = Outcome("Black", 1)
-
 
     def placeBets(self):
         _bet = Bet(1, self.black)
         if self.isValid(_bet):
             self.stake -= _bet.amount
             self.table.placeBet(_bet)
-
-
+            self.roundsToGo -=1
 
 class RouletteGame(object):
     """
@@ -441,7 +429,7 @@ class RouletteGame(object):
             player.placeBets()
             # spin the wheel
             win_bin = self.wheel.next()
-
+            assert(len(list(b for b in self.table))==1)
             for bet in self.table:
 
                 outcomes_matching_bet_name = self.wheel.getOutcome(bet.outcome.name)
@@ -456,7 +444,6 @@ class RouletteGame(object):
 
 class Simulator(object):
 
-
     def __init__(self, game, player):
         self.initDuration = 250 # cycles that a player
         self.initStake = 100
@@ -468,23 +455,25 @@ class Simulator(object):
 
     def session(self):
         stake_vales = []
+
         while self.player.playing():
             self.game.cycle(self.player)
             stake_vales.append(self.player.stake)
-
-
         return stake_vales
 
     def gather(self):
         for i in range(self.samples):
             self.reset_player()
             SV = self.session()
+            # print "Stake Values", SV
             self.duration.append(len(SV)) # length of the session List - duration
             self.maxima.append(max(SV)) # the maximum value in the session List -  maximum metrics
         self.report()
+
     def reset_player(self):
         self.player.setStake(self.initStake)
         self.player.setRounds(self.initDuration)
+        self.player.reset_class_defaults()
 
     def getAverage(self, L):
         return float(sum(L)) / len(L)
@@ -499,6 +488,8 @@ class Simulator(object):
               (self.player.__class__.__name__, self.getAverage(self.maxima), self.standard_deviation(self.maxima))
         print "%s's Duration average[ %f ] Duration standard deviation[ %f ] " %\
               (self.player.__class__.__name__, self.getAverage(self.duration), self.standard_deviation(self.duration))
+        print "maxima", self.maxima
+        print "duration", self.duration, "\n\n"
 
 class RunGame(object):
     def __init__(self):
@@ -515,28 +506,6 @@ class RunGame(object):
         # for i in range(95):
         #     self.game.cycle(p57)
 
-
-
 if __name__ == '__main__':
     RunGame()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
