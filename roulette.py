@@ -319,7 +319,7 @@ class Player(object):
         self.stake = stake
         self.roundsToGo = roundsToGo
 
-    def playing(self):
+    def playing(self, deduct_round=True):
         """
         Returns True while ROUNDSTOGO is not 0
         """
@@ -338,6 +338,9 @@ class Player(object):
         return self.table.isValid(bet)
 
     def reset_class_defaults(self):
+        pass
+
+    def winners(self, wheel_obj, winning_bin):
         pass
 
     def win(self, bet):
@@ -376,13 +379,11 @@ class Martingale(Player):
 
         if (self.stake - _bet.amount) < 0:
             _bet =  Bet(self.stake, self.black)
-            # print "__2__",_bet.amount
-            # print self.stake, _bet.amount
 
         if self.isValid(_bet):
             self.stake -= _bet.amount
             self.table.placeBet(_bet)
-            self.roundsToGo -=1
+
 
     def win(self, bet):
         self.lossCount = 0
@@ -395,6 +396,35 @@ class Martingale(Player):
     def reset_class_defaults(self):
         self.baseWager = Martingale._baseWager
         self.lossCount = Martingale._lossCount
+
+class SevenReds(Martingale):
+    """
+    SevenReds is a Martingale player who only places bets after the wheel has spun red 7 times
+    """
+    def __init__(self, table, stake, roundsToGo):
+        Martingale.__init__(self, table, stake, roundsToGo)
+        self.redCount = 7
+
+    def playing(self):
+        if self.roundsToGo > 0 and self.stake > 0 and self.redCount == 0:
+            self.redCount = 7
+            return True
+        else:
+            return False
+
+    def winners(self, wheel_obj, winning_bin):
+        """
+        The winning_bin is the BIN selected by WHEEL.
+        I also include the wheel_object just because it makes it easier to compare outcomes when we have access to
+        the getOutcome method. Object equality yo! Might want to refactor that...
+
+        """
+        _red_outcome = Outcome("Red", 1)
+        singleton_red_outcome = wheel_obj.getOutcome(_red_outcome.name)
+        if singleton_red_outcome.pop() in winning_bin.outcomes:
+            self.redCount -= 1
+        else:
+            self.redCount = 7
 
 class Passenger57(Player):
     """
@@ -409,7 +439,7 @@ class Passenger57(Player):
         if self.isValid(_bet):
             self.stake -= _bet.amount
             self.table.placeBet(_bet)
-            self.roundsToGo -=1
+
 
 class RouletteGame(object):
     """
@@ -422,25 +452,32 @@ class RouletteGame(object):
         self.wheel = wheel
         self.table = table
 
+    def notify_player(self, player, wheel_obj, winning_bin ):
+        player.winners(wheel_obj, winning_bin )
+
     def cycle(self, player):
-        # ask player if they are playing
+
         if player.playing():
             # command player to place a bet
             player.placeBets()
-            # spin the wheel
-            win_bin = self.wheel.next()
-            assert(len(list(b for b in self.table))==1)
-            for bet in self.table:
 
-                outcomes_matching_bet_name = self.wheel.getOutcome(bet.outcome.name)
-                if outcomes_matching_bet_name.pop() in win_bin.outcomes:
-                    #print "player wins! %i" % bet.winAmount()
-                    player.win(bet)
-                else:
-                    #print "player lost! %i" % bet.loseAmount()
-                    player.lose(bet)
-                # print player.stake
-                self.table.removeBet()
+        win_bin = self.wheel.next() # this returns an bin class object which contains Outcomes. OUTCOMES are an attribute of BIN
+
+        for bet in self.table:
+            outcomes_matching_bet_name = self.wheel.getOutcome(bet.outcome.name)
+            assert len(outcomes_matching_bet_name) == 1
+            if outcomes_matching_bet_name.pop() in win_bin.outcomes:
+                player.win(bet)
+            else:
+                player.lose(bet)
+
+            # remove the bet
+            self.table.removeBet()
+        else:
+            # send winning bin to play so they can see winning the outcomes even when they don't play
+            self.notify_player(player, wheel_obj=self.wheel, winning_bin=win_bin)
+            player.roundsToGo -= 1 # reduce roundToGo
+
 
 class Simulator(object):
 
@@ -456,7 +493,7 @@ class Simulator(object):
     def session(self):
         stake_vales = []
 
-        while self.player.playing():
+        while self.player.roundsToGo != 0 and self.player.stake != 0:
             self.game.cycle(self.player)
             stake_vales.append(self.player.stake)
         return stake_vales
@@ -466,6 +503,7 @@ class Simulator(object):
             self.reset_player()
             SV = self.session()
             # print "Stake Values", SV
+
             self.duration.append(len(SV)) # length of the session List - duration
             self.maxima.append(max(SV)) # the maximum value in the session List -  maximum metrics
         self.report()
@@ -491,6 +529,10 @@ class Simulator(object):
         print "maxima", self.maxima
         print "duration", self.duration, "\n\n"
 
+
+
+
+
 class RunGame(object):
     def __init__(self):
         wheel = Wheel()
@@ -501,6 +543,10 @@ class RunGame(object):
 
         _martin = Martingale(table=self.table, stake=100, roundsToGo=100)
         sim = Simulator(self.game, _martin)
+        sim.gather()
+
+        _7R = SevenReds(table=self.table, stake=100, roundsToGo=100)
+        sim = Simulator(self.game, _7R)
         sim.gather()
         # p57 = Passenger57(table=self.table, stake=100, roundsToGo=100)
         # for i in range(95):

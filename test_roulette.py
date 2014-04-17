@@ -223,10 +223,10 @@ class MartingaleTestBlack(GameBlack):
     Black wins every time
     """
     def test_black(self):
-
         _martin = Martingale(table=self.table, stake=100, roundsToGo=10)
         for i in range(4):
             self.game.cycle(_martin)
+
         self.assertEqual(_martin.stake, 104)
 
         #test setStake and setRounds
@@ -257,10 +257,10 @@ class SimulatorMartingaleRed(GameRed):
         
         _martin = Martingale(table=self.table, stake=100, roundsToGo=100)
         sim = Simulator(self.game, _martin)
-        self.assertEqual(sim.session(), [99,97,93,85,69,37,0])
+        self.assertEqual(sim.session()[0:7], [99,97,93,85,69,37,0])
 
     def test_simulator_gather(self):
-        _martin = Martingale(table=self.table, stake=100, roundsToGo=100)
+        _martin = Martingale(table=self.table, stake=100, roundsToGo=50)
         sim = Simulator(self.game, _martin)
         sim.gather()
         self.assertEqual(sim.duration, list( 7 for d in range(50)))
@@ -277,6 +277,27 @@ class SimulatorP57Black(GameBlack):
         sim.gather()
         self.assertEqual(sim.duration, list( 250 for d in range(50)))
         self.assertEqual(sim.maxima, list( 350 for d in range(50)))
+
+class SevenRedsGameRed(GameRed):
+    def test_sevenreds(self):
+        """
+        SevenReds should win every other time it plays
+        It should not play until 7 rounds have passed
+        """
+        seq = [1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1]
+        _SR = SevenReds(table=self.table, stake=100, roundsToGo=100)
+
+        for i in range(76):
+
+            seed = seq.pop(0)
+            self.nR.setSeed(seed)
+            self.game.cycle(_SR)
+            seq.append(seed)
+            if i < 7:
+                # there should be non betting until round 8
+                self.assertEqual(_SR.stake, 100)
+        # 5 wins, 5 loses
+        self.assertEqual(_SR.stake, 104)
 
 if __name__ == '__main__':
     logging.basicConfig( stream=sys.stderr )
