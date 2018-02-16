@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 __author__ = 'mattmckay'
 
-import random
+import argparse
 import math
+import random
+
 
 class Outcome(object):
     """
@@ -13,7 +15,7 @@ class Outcome(object):
         self.name = str(name)
         self.odds = int(odds)
 
-    def winAmount(self, amount):
+    def win_amount(self, amount):
         return self.odds * amount
 
     def __eq__(self, other):
@@ -24,6 +26,7 @@ class Outcome(object):
 
     def __str__(self):
         return "%s (%d:1)" % ( self.name, self.odds )
+
 
 class Bin(object):
     """
@@ -39,6 +42,7 @@ class Bin(object):
     def __str__(self):
         return ', '.join( map(str,self.outcomes) )
 
+
 class Wheel(object):
     """
     Wheel contains the 38 individual bins on the Roulette wheel, plus a random number generator. It can select a Bin at
@@ -53,7 +57,7 @@ class Wheel(object):
         self.bins = tuple( Bin() for i in range(38) )
         self.all_outcomes = frozenset()
 
-    def addOutcome(self, number, outcome):
+    def add_outcome(self, number, outcome):
         """
         adds the given OUTCOME to the BIN with the given number.
         """
@@ -73,10 +77,11 @@ class Wheel(object):
         """
         return self.bins[bin]
 
-    def getOutcome(self, name):
+    def get_outcome(self, name):
         OC = set([  oc for oc in self.all_outcomes if oc.name.lower() == name.lower()  ])
         assert len(OC) == 1
         return OC
+
 
 class NonRandom(random.Random):
     """
@@ -85,7 +90,7 @@ class NonRandom(random.Random):
     def __init__(self):
         pass
 
-    def setSeed(self, value):
+    def set_seed(self, value):
         """
         saves the value as the next value to return
         """
@@ -94,14 +99,15 @@ class NonRandom(random.Random):
     def choice(self, seq):
         return seq[self.value]
 
+
 class BinBuilder(object):
 
     def __init__(self):
         pass
 
-    def buildBins(self, wheel):
+    def build_bins(self, wheel):
         """
-        creates the OUTCOME instances and uses the addOutcome() method to place each OUTCOME in the appropriate BIN
+        creates the OUTCOME instances and uses the add_outcome() method to place each OUTCOME in the appropriate BIN
         of the WHEEL.
 
         There should be separate methods to generate the straight bets, split bets, street bets, corner bets, line bets,
@@ -111,7 +117,7 @@ class BinBuilder(object):
         """
         self.wheel = wheel
 
-        OC_dict = {}
+        outcome_dict = {}
         outcomes_list = self.strait_bets()+\
                        self.split_bets()+\
                        self.street_bet()+\
@@ -124,11 +130,11 @@ class BinBuilder(object):
 
         # create a name : outcome dict so that there is only one Outcome obj per unique name
         for bo_tup in outcomes_list:
-            OC_dict[bo_tup[1].name] = bo_tup[1]
+            outcome_dict[bo_tup[1].name] = bo_tup[1]
 
         for bo_tup in outcomes_list:
             # add the outcomes to wheel using only Outcome objects with unique attributes
-            self.wheel.addOutcome(  bo_tup[0]  , OC_dict[bo_tup[1].name]  )
+            self.wheel.add_outcome(  bo_tup[0]  , outcome_dict[bo_tup[1].name]  )
 
     def strait_bets(self):
         """
@@ -247,6 +253,7 @@ class BinBuilder(object):
                 outcome_list.append((i, Outcome(k, 1)))
         return outcome_list
 
+
 class Bet(object):
     """
     Bet associates an amount and an Outcome. We can also associate a Bet with a Player.
@@ -257,40 +264,39 @@ class Bet(object):
         self.amount = amount
         self.outcome = outcome
 
-    def winAmount(self):
-        return self.amount + self.outcome.winAmount(self.amount)
+    def win_amount(self):
+        return self.amount + self.outcome.win_amount(self.amount)
 
-    def loseAmount(self):
+    def lose_amount(self):
         return self.amount
 
     def __str__(self):
         return "amount on " + str(self.outcome)
 
+
 class Table(object):
     """
-
-
     """
     def __init__(self, limit):
         assert type(limit) == int
         self.limit = limit
         self.bets = []
 
-    def isValid(self, bet):
+    def is_valid(self, bet):
         bets_total = sum(list(b.amount for b in self.bets))
         if bets_total + bet.amount <= self.limit:
             return True
         else:
             return False
 
-    def placeBet(self, bet):
+    def place_bet(self, bet):
 
         self.bets.append(bet)
         bets_total = sum(list(b.amount for b in self.bets))
         if bets_total > self.limit:
             raise InvalidBet(self.bets)
 
-    def removeBet(self):
+    def remove_bet(self):
         self.bets = self.bets[1::]
 
     def __iter__(self):
@@ -298,6 +304,7 @@ class Table(object):
 
     def __str__(self):
         return str(list( str(b) for b in self.bets ) )
+
 
 class InvalidBet(Exception):
     """
@@ -310,32 +317,33 @@ class InvalidBet(Exception):
         return  "The total of all bets has exceeded the bet limit. This shouldn't normally happen. Bets = %s Sum = %i" %\
               (str(list(b.amount for b in self.bets)), sum(list(b.amount for b in self.bets)) )
 
+
 class Player(object):
     """
     Abstract player superclass
     """
-    def __init__(self, table, stake=100, roundsToGo=100):
+    def __init__(self, table, stake=100, rounds_to_go=100):
         self.table = table
         self.stake = stake
-        self.roundsToGo = roundsToGo
+        self.rounds_to_go = rounds_to_go
 
     def playing(self, deduct_round=True):
         """
         Returns True while ROUNDSTOGO is not 0
         """
-        return self.roundsToGo > 0 and self.stake > 0
+        return self.rounds_to_go > 0 and self.stake > 0
 
-    def placeBets(self):
+    def place_bets(self):
         """
         deducts amount from stake and places BET on table
         """
         raise NotImplementedError
 
-    def isValid(self, bet):
+    def is_valid(self, bet):
         """
         checks with TABLE to see if the BET is valid
         """
-        return self.table.isValid(bet)
+        return self.table.is_valid(bet)
 
     def reset_class_defaults(self):
         pass
@@ -344,69 +352,71 @@ class Player(object):
         pass
 
     def win(self, bet):
-        self.stake += bet.winAmount()
+        self.stake += bet.win_amount()
 
     def lose(self, bet):
         pass
 
-    def setStake(self, stake):
+    def set_stake(self, stake):
         self.stake = stake
 
-    def setRounds(self, roundsToGo):
-        self.roundsToGo = roundsToGo
+    def set_rounds(self, rounds_to_go):
+        self.rounds_to_go = rounds_to_go
+
 
 class Martingale(Player):
     """
-
+    Martingale is a Player as described: https://en.wikipedia.org/wiki/Martingale_(betting_system)
     """
-    _baseWager = 1
-    _lossCount = 0
-    def __init__(self, table, stake, roundsToGo):
-        Player.__init__(self, table, stake, roundsToGo)
-        self.baseWager = 1
-        self.lossCount = 0
-        self.betMultiple = 2**self.lossCount # this should always equal 2**lossCount
+    _base_wager = 1
+    _loss_count = 0
+    def __init__(self, table, stake, rounds_to_go):
+        Player.__init__(self, table, stake, rounds_to_go)
+        self.base_wager = 1
+        self.loss_count = 0
+        self.bet_multiple = 2**self.loss_count # this should always equal 2**loss_count
         self.black = Outcome("Black", 1)
 
-    def placeBets(self):
+    def place_bets(self):
         """
         makes a BET based on the martingale strategy and the LOSSCOUNT
         """
-        self.betMultiple = 2**self.lossCount
+        self.bet_multiple = 2**self.loss_count
 
-        _bet =  Bet(self.baseWager*self.betMultiple, self.black)
+        _bet =  Bet(self.base_wager*self.bet_multiple, self.black)
         # print "__1__",self.stake, _bet.amount
 
         if (self.stake - _bet.amount) < 0:
             _bet =  Bet(self.stake, self.black)
 
-        if self.isValid(_bet):
+        if self.is_valid(_bet):
             self.stake -= _bet.amount
-            self.table.placeBet(_bet)
+            self.table.place_bet(_bet)
 
 
     def win(self, bet):
-        self.lossCount = 0
-        self.stake += bet.winAmount()
+        self.loss_count = 0
+        self.stake += bet.win_amount()
 
     def lose(self, bet):
-        self.lossCount += 1
+        self.loss_count += 1
 
 
     def reset_class_defaults(self):
-        self.baseWager = Martingale._baseWager
-        self.lossCount = Martingale._lossCount
+        self.base_wager = Martingale._base_wager
+        self.loss_count = Martingale._loss_count
+
 
 class SevenReds(Martingale):
     """
     SevenReds is a Martingale player who only places bets after the wheel has spun red 7 times
     """
-    def __init__(self, table, stake, roundsToGo):
-        Martingale.__init__(self, table, stake, roundsToGo)
+    def __init__(self, table, stake, rounds_to_go):
+        Martingale.__init__(self, table, stake, rounds_to_go)
         self.redCount = 7
 
     def playing(self):
-        if self.roundsToGo > 0 and self.stake > 0 and self.redCount == 0:
+        if self.rounds_to_go > 0 and self.stake > 0 and self.redCount == 0:
             self.redCount = 7
             return True
         else:
@@ -415,30 +425,30 @@ class SevenReds(Martingale):
     def winners(self, wheel_obj, winning_bin):
         """
         The winning_bin is the BIN selected by WHEEL.
-        I also include the wheel_object just because it makes it easier to compare outcomes when we have access to
-        the getOutcome method. Object equality yo! Might want to refactor that...
-
+        I also include the wheel_object just because it makes it easier to compare outcomes when we
+        have access to the get_outcome method. Object equality yo! Might want to refactor that...
         """
         _red_outcome = Outcome("Red", 1)
-        singleton_red_outcome = wheel_obj.getOutcome(_red_outcome.name)
+        singleton_red_outcome = wheel_obj.get_outcome(_red_outcome.name)
         if singleton_red_outcome.pop() in winning_bin.outcomes:
             self.redCount -= 1
         else:
             self.redCount = 7
 
+
 class Passenger57(Player):
     """
     Passenger57 always bets black
     """
-    def __init__(self, table, stake, roundsToGo):
-        Player.__init__(self, table, stake, roundsToGo)
+    def __init__(self, table, stake, rounds_to_go):
+        Player.__init__(self, table, stake, rounds_to_go)
         self.black = Outcome("Black", 1)
 
-    def placeBets(self):
+    def place_bets(self):
         _bet = Bet(1, self.black)
-        if self.isValid(_bet):
+        if self.is_valid(_bet):
             self.stake -= _bet.amount
-            self.table.placeBet(_bet)
+            self.table.place_bet(_bet)
 
 
 class RouletteGame(object):
@@ -459,12 +469,13 @@ class RouletteGame(object):
 
         if player.playing():
             # command player to place a bet
-            player.placeBets()
+            player.place_bets()
 
-        win_bin = self.wheel.next() # this returns an bin class object which contains Outcomes. OUTCOMES are an attribute of BIN
+        # this returns an bin class object which contains Outcomes.OUTCOMES are an attribute of BIN
+        win_bin = self.wheel.next()
 
         for bet in self.table:
-            outcomes_matching_bet_name = self.wheel.getOutcome(bet.outcome.name)
+            outcomes_matching_bet_name = self.wheel.get_outcome(bet.outcome.name)
             assert len(outcomes_matching_bet_name) == 1
             if outcomes_matching_bet_name.pop() in win_bin.outcomes:
                 player.win(bet)
@@ -472,18 +483,18 @@ class RouletteGame(object):
                 player.lose(bet)
 
             # remove the bet
-            self.table.removeBet()
+            self.table.remove_bet()
         else:
             # send winning bin to play so they can see winning the outcomes even when they don't play
             self.notify_player(player, wheel_obj=self.wheel, winning_bin=win_bin)
-            player.roundsToGo -= 1 # reduce roundToGo
+            player.rounds_to_go -= 1 # reduce roundToGo
 
 
 class Simulator(object):
 
     def __init__(self, game, player):
-        self.initDuration = 250 # cycles that a player
-        self.initStake = 100
+        self.init_duration = 250 # cycles that a player
+        self.init_stake = 100
         self.samples = 50
         self.duration = []
         self.maxima = []
@@ -493,7 +504,7 @@ class Simulator(object):
     def session(self):
         stake_vales = []
 
-        while self.player.roundsToGo != 0 and self.player.stake != 0:
+        while self.player.rounds_to_go != 0 and self.player.stake != 0:
             self.game.cycle(self.player)
             stake_vales.append(self.player.stake)
         return stake_vales
@@ -509,49 +520,55 @@ class Simulator(object):
         self.report()
 
     def reset_player(self):
-        self.player.setStake(self.initStake)
-        self.player.setRounds(self.initDuration)
+        self.player.set_stake(self.init_stake)
+        self.player.set_rounds(self.init_duration)
         self.player.reset_class_defaults()
 
-    def getAverage(self, L):
+    def get_average(self, L):
         return float(sum(L)) / len(L)
 
     def standard_deviation(self, L):
-        _avg = self.getAverage(L)
+        _avg = self.get_average(L)
         dif_sqrd = map(lambda x : ((x - _avg)**2 ), L)
         return math.sqrt(float(sum(dif_sqrd)) / len(dif_sqrd))
 
     def report(self):
-        print "%s's Maxima average[ %f ] Maxima standard deviation[ %f ] "  % \
-              (self.player.__class__.__name__, self.getAverage(self.maxima), self.standard_deviation(self.maxima))
-        print "%s's Duration average[ %f ] Duration standard deviation[ %f ] " %\
-              (self.player.__class__.__name__, self.getAverage(self.duration), self.standard_deviation(self.duration))
-        print "maxima", self.maxima
-        print "duration", self.duration, "\n\n"
-
-
-
+        print "-%s's- \nMaxima Average: [ %f ] \nMaxima Standard Deviation: [ %f ] "  % \
+              (self.player.__class__.__name__, self.get_average(self.maxima), self.standard_deviation(self.maxima))
+        print "Duration Average: [ %f ] \nDuration Standard Deviation: [ %f ] " %\
+              (self.get_average(self.duration), self.standard_deviation(self.duration))
+        print "\nMaxima: ", self.maxima
+        print "\n\nDuration: ", self.duration, "\n\n"
 
 
 class RunGame(object):
     def __init__(self):
+        parser = argparse.ArgumentParser(description='This program simulates rounds of Roulette')
+        parser.add_argument('-s', '--stake', help='Initial player stake', default=100, type=int, required=False)
+        parser.add_argument('-r', '--rounds', help='Rounds to conduct', default=100, type=int, required=False)
+        parser.add_argument('-l', '--limit', help='Table bet limit', default=100, type=int, required=False)
+        args = parser.parse_args()
+
         wheel = Wheel()
-        self.table = Table(limit=100)
+        self.table = Table(limit=args.limit)
         bin_builder = BinBuilder()
-        bin_builder.buildBins(wheel)
+        bin_builder.build_bins(wheel)
         self.game = RouletteGame(wheel, self.table)
 
-        _martin = Martingale(table=self.table, stake=100, roundsToGo=100)
+        print 'Starting Stake: (%d) - Rounds: (%d) - Table Limit: (%d) \n' % \
+              (args.stake, args.rounds, args.limit)
+
+        _martin = Martingale(table=self.table, stake=args.stake, rounds_to_go=args.rounds)
         sim = Simulator(self.game, _martin)
         sim.gather()
 
-        _7R = SevenReds(table=self.table, stake=100, roundsToGo=100)
+        _7R = SevenReds(table=self.table, stake=args.stake, rounds_to_go=args.rounds)
         sim = Simulator(self.game, _7R)
         sim.gather()
-        # p57 = Passenger57(table=self.table, stake=100, roundsToGo=100)
+
+        # p57 = Passenger57(table=self.table, stake=100, rounds_to_go=100)
         # for i in range(95):
         #     self.game.cycle(p57)
 
 if __name__ == '__main__':
     RunGame()
-
